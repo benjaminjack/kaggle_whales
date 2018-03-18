@@ -13,12 +13,13 @@ base_model <- application_vgg16(weights = "imagenet",
 
 freeze_weights(base_model)
 
-siamese_branch <- function(input) {
-  input %>%
-    base_model() %>%
-    layer_flatten() %>%
-    layer_dense(units = 128, activation = "sigmoid")
-}
+# L2 regularization seems to strike the best balance of training speed vs regularizer
+siamese_branch <- keras_model_sequential() %>%
+  base_model() %>%
+  layer_flatten() %>%
+  layer_dense(units = 512, activation = "relu", kernel_regularizer = regularizer_l2(l = 1e-3))
+
+summary(siamese_branch)
 
 left_input <- layer_input(shape = c(DIMS, DIMS, 3))
 left_features <- left_input %>% siamese_branch()
@@ -32,7 +33,7 @@ output <- layer_lambda(list(left_features, right_features), function(x) k_abs(x[
 model <- keras_model(list(left_input, right_input), output)
 
 model %>% compile(
-  optimizer = optimizer_adam(lr = 1e-5),
+  optimizer = optimizer_rmsprop(lr = 2e-5),
   loss = "binary_crossentropy",
   metrics = c("accuracy")
 )
@@ -91,7 +92,7 @@ val_same_pair_labels <- val_labels %>%
   filter(Id != "new_whale", n() >= 2) %>%
   ungroup()
 
-val_pair_generator <- train_pair_generator <- function(batch_size = 4, size = DIMS) {
+val_pair_generator <- function(batch_size = 4, size = DIMS) {
   pair_generator(batch_size = batch_size, 
                  size = size, 
                  labels = val_labels,
@@ -100,12 +101,21 @@ val_pair_generator <- train_pair_generator <- function(batch_size = 4, size = DI
 
 # Fit model --------------------------------------------------------------------------
 
+callbacks_list <- list(
+  callback_model_checkpoint(
+    filepath = "whales.h5",
+    monitor = "val_loss",
+    save_best_only = TRUE
+  )
+)
+
 history <- model %>% fit_generator(
   generator = train_pair_generator,
   steps_per_epoch = 500,
-  epochs = 50,
+  epochs = 20,
   validation_data = val_pair_generator,
-  validation_steps = 50
+  validation_steps = 100,
+  callbacks = callbacks_list
 )
 
 
