@@ -8,11 +8,12 @@ source("model.R")
 
 train_image_gen <- image_data_generator(
   rescale = 1/255,
-  rotation_range = 30,
-  width_shift_range = 0.2,
-  height_shift_range = 0.2,
-  shear_range = 0.2,
-  zoom_range = 0.2
+  rotation_range = 15,
+  width_shift_range = 0.1,
+  height_shift_range = 0.1,
+  shear_range = 0.1,
+  zoom_range = 0.1,
+  horizontal_flip = TRUE
 )
 
 test_image_gen <- image_data_generator(rescale = 1/255)
@@ -108,7 +109,7 @@ callbacks_list <- list(
 
 model %>% fit_generator(
   generator = train_pair_generator,
-  steps_per_epoch = 500,
+  steps_per_epoch = 250,
   epochs = 100,
   validation_data = val_pair_generator,
   validation_steps = 100,
@@ -127,9 +128,15 @@ callbacks_list <- list(
   )
 )
 
+model <- siamese_net()
+
 load_model_weights_hdf5(model, "whales.h5")
 
-unfreeze_weights(base_model, from = "block3_conv1")
+summary(model)
+
+model %>% get_layer(name="siamese_branch") %>% get_layer("vgg16") %>% unfreeze_weights(from = "block3_conv1")
+
+summary(model)
 
 model %>% compile(
   optimizer = optimizer_rmsprop(lr = 1e-5),
@@ -137,9 +144,9 @@ model %>% compile(
   metrics = c("accuracy")
 )
 
-history <- model %>% fit_generator(
+model %>% fit_generator(
   generator = train_pair_generator,
-  steps_per_epoch = 500,
+  steps_per_epoch = 250,
   epochs = 50,
   validation_data = val_pair_generator,
   validation_steps = 100,

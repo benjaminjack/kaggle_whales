@@ -18,7 +18,9 @@ siamese_net <- function() {
   siamese_branch <- keras_model_sequential(name = "siamese_branch") %>%
     base_model() %>%
     layer_flatten() %>% 
-    layer_dense(units = 2048, activation = "sigmoid")
+    layer_dense(units = 1024, activation = "sigmoid")
+  
+  summary(siamese_branch)
   
   left_input <- layer_input(shape = input_shape)
   left_features <- left_input %>% siamese_branch()
